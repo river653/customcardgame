@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Card Drawing Simulator</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+<style>
+:root {
+  --bg: #111827;
+  --panel: #1f2937;
+  --accent: #3b82f6;
+  --text: #f9fafb;
+  --muted: #9ca3af;
+  --radius: 1rem;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--text);
+  display: flex;
+  justify-content: center;
+}
+.app {
+  max-width: 900px;
+  width: 100%;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+}
+.game-header { text-align:center; }
+.game-header h1 { margin:0;font-size:1.4rem; }
+
+.tab-bar {
+  display:flex;
+  flex-wrap:wrap;
+  gap:.25rem;
+}
+.tab-button {
+  border:none;cursor:pointer;
+  padding:.35rem .8rem;
+  border-radius:999px;
+  background:#020617;color:var(--muted);
+  border:1px solid rgba(148,163,184,.5);
+}
+.tab-button.active {
+  background:var(--accent);
+  color:white;
+}
+
+.panel {
+  background: var(--panel);
+  padding:1rem;
+  border-radius:var(--radius);
+  border:1px solid rgba(255,255,255,.2);
+}
+h2 {margin:0 0 .6rem;}
+
+button {
+  background:var(--accent);
+  border:none;color:white;
+  padding:.55rem 1rem;
+  border-radius:.6rem;
+  margin:.3rem .2rem .3rem 0;
+  font-weight:600;cursor:pointer;
+}
+input,select {
+  width:100%;margin-bottom:.5rem;
+  background:#020617;color:white;
+  border:1px solid rgba(148,163,184,.4);
+  border-radius:.4rem;
+  padding:.3rem .4rem;
+}
+
+.players-container {display:flex;flex-direction:column;gap:.55rem;}
+.player-panel {
+  background:rgba(15,23,42,.95);
+  padding:.8rem;border-radius:.6rem;
+  border:1px solid rgba(255,255,255,.2);
+}
+.player-header {
+  display:flex;flex-wrap:wrap;
+  gap:.5rem;align-items:center;
+}
+
+.hand {
+  display:flex;flex-wrap:wrap;
+  gap:.3rem;margin-top:.4rem;
+}
+.hand-card {
+  width:70px;
+  aspect-ratio:2/3;
+  border:2px solid rgba(255,255,255,.2);
+  border-radius:.6rem;
+  overflow:hidden;
+  cursor:pointer;
+  position:relative;
+}
+.hand-card img {width:100%;height:100%;object-fit:cover;}
+.card-index-badge {
+  position:absolute;top:2px;left:2px;
+  background:rgba(0,0,0,.8);
+  padding:.05rem .25rem;
+  font-size:.65rem;border-radius:999px;
+}
+
+.decks-list {display:flex;flex-direction:column;gap:.6rem;margin-top:.6rem;}
+.deck-panel {
+  background:rgba(15,23,42,.8);
+  padding:.5rem;border-radius:.6rem;
+  border:1px solid rgba(148,163,184,.5);
+}
+.deck-panel-main {
+  display:flex;flex-wrap:wrap;
+  gap:.5rem;align-items:center;margin-top:.3rem;
+}
+.deck-preview-small {
+  width:50px;aspect-ratio:2/3;
+  border-radius:.4rem;border:1px solid rgba(148,163,184,.5);
+  overflow:hidden;
+}
+.deck-preview-small img {width:100%;height:100%;object-fit:cover;}
+
+.deck-row {
+  display:flex;
+  flex-wrap:wrap;
+  gap:.4rem;
+  align-items:center;
+  margin-bottom:.4rem;
+  padding:.3rem .2rem;
+  border-bottom:1px solid rgba(255,255,255,.1);
+}
+.deck-row:last-child { border-bottom:none; }
+.deck-row-label {
+  min-width:60px;
+  color:var(--muted);
+}
+.deck-row-preview {
+  width:50px;height:70px;
+  border-radius:.4rem;
+  border:1px solid rgba(148,163,184,.6);
+  overflow:hidden;
+}
+.deck-row-preview img {width:100%;height:100%;object-fit:cover;}
+.deck-row-style {
+  width:auto;
+  min-width:100px;
+  margin-bottom:0;
+}
+.deck-row-draw {
+  margin-left:auto;
+  flex-shrink:0;
+  white-space:nowrap;
+}
+
+.deck-order-editor {
+  margin-top:.5rem;
+  padding-top:.4rem;
+  border-top:1px dashed rgba(148,163,184,.6);
+}
+.deck-order-row {
+  display:flex;
+  align-items:center;
+  gap:.4rem;
+  margin-bottom:.3rem;
+}
+.deck-order-thumb {
+  width:40px;
+  height:56px;
+  border-radius:.3rem;
+  border:1px solid rgba(148,163,184,.6);
+  overflow:hidden;
+  cursor:pointer;
+}
+.deck-order-thumb img {
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+.deck-order-title {
+  flex:1;
+  font-size:.8rem;
+  color:var(--muted);
+}
+.deck-order-buttons button {
+  padding:.25rem .5rem;
+  font-size:.8rem;
+  margin:0 .1rem;
+}
+
+#fullscreenOverlay {
+  position:fixed;inset:0;
+  background:rgba(0,0,0,.95);
+  display:none;justify-content:center;
+  align-items:center;z-index:9999;
+}
+#fullscreenImage {
+  max-width:95%;max-height:95%;
+  border-radius:1rem;
+}
+.fullscreen-arrow {
+  position:absolute;
+  top:50%;
+  transform:translateY(-50%);
+  background:rgba(15,23,42,.7);
+  border:none;
+  color:white;
+  font-size:1.5rem;
+  padding:.4rem .6rem;
+  border-radius:999px;
+  cursor:pointer;
+}
+#fullscreenPrev { left:10px; }
+#fullscreenNext { right:10px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+<header class="game-header">
+  <h1 id="gameTitleDisplay">Untitled Game</h1>
+</header>
+
+<nav id="tabBar" class="tab-bar"></nav>
+
+<section class="panel" data-panel-id="setup" id="setupPanel">
+  <h2>Setup</h2>
+  <label>Game title</label>
+  <input id="gameTitleInput" type="text" placeholder="Name of the game" />
+  <label>Number of players</label>
+  <input id="playerCount" type="number" min="1" value="2" />
+  <label>New Deck Name</label>
+  <input id="deckName" type="text" placeholder="e.g. Main Deck" />
+  <label>Deck Card Fronts</label>
+  <input id="cardFronts" type="file" multiple accept="image/*" />
+  <label>Deck Back Image</label>
+  <input id="cardBack" type="file" accept="image/*" />
+  <label>Import Deck (.zip)</label>
+  <input id="importZip" type="file" accept=".zip" />
+  <button id="initDeckBtn">Create Deck</button>
+  <button id="resetEverythingBtn">Reset Everything</button>
+  <div style="margin-top:.4rem;">
+    <button id="exportGameBtn">Export Game</button>
+    <button id="importGameBtn">Import Game</button>
+    <input id="importGameInput" type="file" accept=".zip" style="display:none;" />
+  </div>
+</section>
+
+<section class="panel" data-panel-id="options" id="optionsPanel">
+  <h2>Options</h2>
+  <label>Layout</label>
+  <select id="layoutModeSelect">
+    <option value="tabs">Tabbed layout</option>
+    <option value="all">Show all</option>
+  </select>
+  <label>Return confirmation</label>
+  <select id="returnConfirmSelect">
+    <option value="on">Ask before returning cards</option>
+    <option value="off">Return immediately</option>
+  </select>
+  <label>Show draw numbers on cards</label>
+  <select id="drawNumbersSelect">
+    <option value="no">No</option>
+    <option value="chrono">Chronological</option>
+    <option value="perDeck">Per-deck</option>
+  </select>
+</section>
+
+<section class="panel" data-panel-id="decks" id="decksPanel">
+  <h2>Decks</h2>
+  <button id="clearHandsBtn">Clear All Hands</button>
+  <button id="shuffleAllDecksBtn">Shuffle All Decks</button>
+  <button id="returnAllDecksBtn">Return All Decks to Order</button>
+  <div id="decksContainer" class="decks-list"></div>
+</section>
+
+<div id="playersContainer" class="players-container"></div>
+
+</div>
+
+<div id="fullscreenOverlay">
+  <button id="fullscreenPrev" class="fullscreen-arrow">&#9664;</button>
+  <img id="fullscreenImage" />
+  <button id="fullscreenNext" class="fullscreen-arrow">&#9654;</button>
+</div>
+
+<script>
+/* ---------- GLOBAL STATE ---------- */
+const state = {
+  decks: [],   // {id,name,backUrl,cards:[{frontUrl, name}],order:[indices],drawPile:[indices],showOrderEditor?}
+  players: [], // {name,mode:"individual"|"merged",assignedDeckIds,slotDrawStyles,hand:[{deckId,cardIndex,isFaceUp,drawStyle}]}
+  importedFronts: null,
+  importedBack: null,
+  gameName: "",
+  layoutMode: "tabs",
+  requireReturnConfirm: true,
+  drawNumberMode: "none",
+  fullscreen: { source:null, playerIndex:null, handIndex:null, deckId:null, orderPos:null }
+};
+
+/* ---------- DOM ---------- */
+const els = {
+  tabBar: document.getElementById("tabBar"),
+  playersContainer: document.getElementById("playersContainer"),
+  decksContainer: document.getElementById("decksContainer"),
+  gameTitleInput: document.getElementById("gameTitleInput"),
+  gameTitleDisplay: document.getElementById("gameTitleDisplay"),
+  playerCount: document.getElementById("playerCount"),
+  deckName: document.getElementById("deckName"),
+  cardFronts: document.getElementById("cardFronts"),
+  cardBack: document.getElementById("cardBack"),
+  importZip: document.getElementById("importZip"),
+  initDeckBtn: document.getElementById("initDeckBtn"),
+  resetEverythingBtn: document.getElementById("resetEverythingBtn"),
+  exportGameBtn: document.getElementById("exportGameBtn"),
+  importGameBtn: document.getElementById("importGameBtn"),
+  importGameInput: document.getElementById("importGameInput"),
+  layoutModeSelect: document.getElementById("layoutModeSelect"),
+  returnConfirmSelect: document.getElementById("returnConfirmSelect"),
+  drawNumbersSelect: document.getElementById("drawNumbersSelect"),
+  clearHandsBtn: document.getElementById("clearHandsBtn"),
+  shuffleAllDecksBtn: document.getElementById("shuffleAllDecksBtn"),
+  returnAllDecksBtn: document.getElementById("returnAllDecksBtn"),
+  fullscreenOverlay: document.getElementById("fullscreenOverlay"),
+  fullscreenImage: document.getElementById("fullscreenImage"),
+  fullscreenPrev: document.getElementById("fullscreenPrev"),
+  fullscreenNext: document.getElementById("fullscreenNext")
+};
+
+let activeTabId = "setup";
+
+/* ---------- UTIL ---------- */
+function shuffle(arr){
+  for(let i=arr.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+  return arr;
+}
+function getDeckById(id){
+  return state.decks.find(d=>d.id===id)||null;
+}
+function shouldConfirm(msg){
+  return state.requireReturnConfirm ? confirm(msg) : true;
+}
+
+/* ---------- TABS ---------- */
+function updateTabHighlight(){
+  els.tabBar.querySelectorAll(".tab-button").forEach(btn=>{
+    btn.classList.toggle("active", btn.dataset.tabId === activeTabId);
+  });
+}
+function rebuildTabs(){
+  const bar=els.tabBar;
+  bar.innerHTML="";
+  if(state.layoutMode==="all"){bar.style.display="none";return;}
+  bar.style.display="flex";
+  const tabs=[
+    {id:"setup",label:"Setup"},
+    {id:"options",label:"Options"},
+    {id:"decks",label:"Decks"},
+    ...state.players.map((p,i)=>({id:`player-${i}`,label:p.name||`Player ${i+1}`}))
+  ];
+  if(!tabs.some(t=>t.id===activeTabId)) activeTabId="setup";
+  tabs.forEach(t=>{
+    const b=document.createElement("button");
+    b.className="tab-button";
+    b.dataset.tabId=t.id;
+    b.textContent=t.label;
+    b.onclick=()=>{activeTabId=t.id;applyLayout();};
+    bar.appendChild(b);
+  });
+  updateTabHighlight();
+}
+function applyLayout(){
+  const panels=document.querySelectorAll("[data-panel-id]");
+  if(state.layoutMode==="all"){
+    els.tabBar.style.display="none";
+    panels.forEach(p=>p.style.display="block");
+  } else {
+    els.tabBar.style.display="flex";
+    panels.forEach(p=>p.style.display=(p.dataset.panelId===activeTabId?"block":"none"));
+  }
+  updateTabHighlight();
+}
+
+/* ---------- DECK CREATION ---------- */
+function createDeckFromFiles(frontFiles,backFile,name){
+  const filesArr=[...frontFiles].sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+  const cards=filesArr.map(f=>({frontUrl:URL.createObjectURL(f),name:f.name||""}));
+  const order=cards.map((_,i)=>i);
+  const drawPile=[...order];
+  const id=`deck-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+  state.decks.push({
+    id,
+    name:name||`Deck ${state.decks.length+1}`,
+    backUrl:URL.createObjectURL(backFile),
+    cards,
+    order,
+    drawPile,
+    showOrderEditor:false
+  });
+  state.importedFronts=null;
+  state.importedBack=null;
+}
+
+/* ---------- PLAYERS ---------- */
+function setPlayerCount(n){
+  const old=state.players;
+  const next=[];
+  for(let i=0;i<n;i++){
+    if(old[i]) {
+      const p = old[i];
+      if(!p.slotDrawStyles) p.slotDrawStyles = new Array(p.assignedDeckIds.length).fill("random");
+      next.push(p);
+    } else {
+      const initialDeckCount = state.decks[0] ? 1 : 0;
+      next.push({
+        name:`Player ${i+1}`,
+        mode:"individual",
+        assignedDeckIds: state.decks[0] ? [state.decks[0].id] : [],
+        slotDrawStyles: new Array(initialDeckCount).fill("random"),
+        hand:[]
+      });
+    }
+  }
+  state.players=next;
+}
+
+function rebuildPlayersUI(){
+  els.playersContainer.innerHTML="";
+  state.players.forEach((p,i)=>{
+    const panel=document.createElement("section");
+    panel.className="panel player-panel";
+    panel.dataset.panelId=`player-${i}`;
+
+    const header=document.createElement("div");
+    header.className="player-header";
+
+    const nameLabel=document.createElement("label");
+    nameLabel.textContent="Name";
+    const nameInput=document.createElement("input");
+    nameInput.value=p.name;
+    nameInput.oninput=e=>{
+      p.name=e.target.value||`Player ${i+1}`;
+      rebuildTabs();
+    };
+    nameLabel.appendChild(nameInput);
+    header.appendChild(nameLabel);
+
+    const modeLabel=document.createElement("label");
+    modeLabel.textContent="Draw mode";
+    const modeSelect=document.createElement("select");
+    [["individual","Individual Decks"],["merged","Merged"]].forEach(([val,txt])=>{
+      const o=document.createElement("option");
+      o.value=val;o.textContent=txt;
+      modeSelect.appendChild(o);
+    });
+    modeSelect.value=p.mode;
+    modeSelect.onchange=e=>{
+      p.mode=e.target.value;
+      rebuildPlayersUI();
+      renderHands();
+    };
+    modeLabel.appendChild(modeSelect);
+    header.appendChild(modeLabel);
+    panel.appendChild(header);
+
+    const countLabel=document.createElement("label");
+    countLabel.textContent="Number of decks";
+    const countInput=document.createElement("input");
+    countInput.type="number";countInput.min="0";
+    countInput.value=p.assignedDeckIds.length;
+    countInput.onchange=e=>{
+      let n=parseInt(e.target.value)||0;
+      let cur=[...p.assignedDeckIds];
+      let styles = p.slotDrawStyles || [];
+      if(n>cur.length){
+        const first=state.decks[0]?.id||null;
+        while(cur.length<n) cur.push(first);
+        while(styles.length<n) styles.push("random");
+      } else {
+        cur.length=n;
+        styles.length=n;
+      }
+      p.assignedDeckIds=cur;
+      p.slotDrawStyles=styles;
+      rebuildPlayersUI();
+      renderHands();
+    };
+    countLabel.appendChild(countInput);
+    panel.appendChild(countLabel);
+
+    const container=document.createElement("div");
+    p.assignedDeckIds.forEach((deckId,slot)=>{
+      const row=document.createElement("div");
+      row.className="deck-row";
+
+      const deck=getDeckById(deckId);
+
+      const label=document.createElement("div");
+      label.className="deck-row-label";
+      label.textContent=`Deck ${slot+1}`;
+      row.appendChild(label);
+
+      const sel=document.createElement("select");
+      state.decks.forEach(d=>{
+        const o=document.createElement("option");
+        o.value=d.id;o.textContent=d.name;
+        if(d.id===deckId) o.selected=true;
+        sel.appendChild(o);
+      });
+      sel.onchange=e=>{
+        p.assignedDeckIds[slot]=e.target.value;
+        rebuildPlayersUI();
+        renderHands();
+      };
+      row.appendChild(sel);
+
+      const prev=document.createElement("div");
+      prev.className="deck-row-preview";
+      if(deck){
+        const im=document.createElement("img");
+        im.src=deck.backUrl;
+        prev.appendChild(im);
+      }
+      row.appendChild(prev);
+
+      if(p.mode==="individual"){
+        const styleSelect=document.createElement("select");
+        styleSelect.className="deck-row-style";
+        [["random","Random"],["sequential","Sequential"]].forEach(([val,txt])=>{
+          const o=document.createElement("option");
+          o.value=val;o.textContent=txt;
+          styleSelect.appendChild(o);
+        });
+        const currentStyle = p.slotDrawStyles && p.slotDrawStyles[slot] ? p.slotDrawStyles[slot] : "random";
+        styleSelect.value=currentStyle;
+        styleSelect.onchange=e=>{
+          p.slotDrawStyles[slot]=e.target.value;
+        };
+        row.appendChild(styleSelect);
+
+        const drawBtn=document.createElement("button");
+        drawBtn.className="deck-row-draw";
+        drawBtn.textContent="Draw";
+        drawBtn.onclick=()=>drawFromSpecificDeck(i,slot);
+        row.appendChild(drawBtn);
+      }
+
+      container.appendChild(row);
+    });
+    panel.appendChild(container);
+
+    const info=document.createElement("h3");
+    info.innerHTML=`Hand: <small><span id="count${i}">${p.hand.length}</span></small>`;
+    panel.appendChild(info);
+
+    const drawBtn=document.createElement("button");
+    drawBtn.textContent="Draw Card";
+    if(p.mode==="individual") drawBtn.style.display="none";
+    drawBtn.onclick=()=>drawCard(i);
+    panel.appendChild(drawBtn);
+
+    const retBtn=document.createElement("button");
+    retBtn.textContent="Return Hand";
+    retBtn.onclick=()=>returnHand(i);
+    panel.appendChild(retBtn);
+
+    const handDiv=document.createElement("div");
+    handDiv.className="hand";
+    handDiv.id=`hand${i}`;
+    panel.appendChild(handDiv);
+
+    els.playersContainer.appendChild(panel);
+  });
+  rebuildTabs();
+  applyLayout();
+}
+
+/* ---------- HAND RENDER ---------- */
+function renderHands(){
+  state.players.forEach((p,i)=>{
+    const hand=document.getElementById(`hand${i}`);
+    if(!hand) return;
+    hand.innerHTML="";
+    let perDeckCounts = state.drawNumberMode==="perDeck" ? {} : null;
+
+    p.hand.forEach((card,ci)=>{
+      const deck=getDeckById(card.deckId);
+      if(!deck) return;
+      const url = card.isFaceUp ? deck.cards[card.cardIndex].frontUrl : deck.backUrl;
+
+      const c=document.createElement("div");
+      c.className="hand-card";
+
+      const im=document.createElement("img");
+      im.src=url;
+      c.appendChild(im);
+
+      let badgeNumber=null;
+      if(state.drawNumberMode==="chrono"){
+        badgeNumber = ci+1;
+      } else if(state.drawNumberMode==="perDeck"){
+        perDeckCounts[card.deckId] = (perDeckCounts[card.deckId]||0)+1;
+        badgeNumber = perDeckCounts[card.deckId];
+      }
+      if(badgeNumber!==null){
+        const badge=document.createElement("div");
+        badge.className="card-index-badge";
+        badge.textContent=badgeNumber;
+        c.appendChild(badge);
+      }
+
+      c.oncontextmenu=e=>{
+        e.preventDefault();
+        returnCardFromHand(i,ci);
+      };
+      c._longReturn=false;
+      c.ontouchstart=()=>{
+        c._longReturn=false;
+        c._pressTimer=setTimeout(()=>{
+          c._longReturn=true;
+          returnCardFromHand(i,ci);
+        },600);
+      };
+      c.ontouchend=()=>clearTimeout(c._pressTimer);
+      c.ontouchcancel=c.ontouchend;
+      c.onclick=()=>{
+        if(c._longReturn){ c._longReturn=false; return; }
+        openFullscreenFromHand(i,ci);
+      };
+
+      hand.appendChild(c);
+    });
+
+    const cnt=document.getElementById(`count${i}`);
+    if(cnt) cnt.textContent=p.hand.length;
+  });
+}
+
+/* ---------- FULLSCREEN (HAND + ORDER) ---------- */
+function setFullscreenImageFromHand(pi,hi){
+  const p = state.players[pi];
+  if(!p || !p.hand[hi]) return;
+  const card = p.hand[hi];
+  const deck = getDeckById(card.deckId);
+  if(!deck) return;
+  p.hand.forEach((c,idx)=>{ if(idx!==hi) c.isFaceUp=false; });
+  card.isFaceUp = true;
+  els.fullscreenImage.src = deck.cards[card.cardIndex].frontUrl;
+  renderHands();
+}
+function setFullscreenImageFromOrder(deckId,pos){
+  const deck = getDeckById(deckId);
+  if(!deck) return;
+  els.fullscreenImage.src = deck.cards[deck.order[pos]].frontUrl;
+}
+function openFullscreenFromHand(pi,hi){
+  state.fullscreen = {source:"hand",playerIndex:pi,handIndex:hi,deckId:null,orderPos:null};
+  els.fullscreenOverlay.style.display="flex";
+  setFullscreenImageFromHand(pi,hi);
+}
+function openFullscreenFromOrder(deckId,pos){
+  state.fullscreen = {source:"order",playerIndex:null,handIndex:null,deckId,orderPos:pos};
+  els.fullscreenOverlay.style.display="flex";
+  setFullscreenImageFromOrder(deckId,pos);
+}
+function closeFullscreen(){
+  if(state.fullscreen.source==="hand"){
+    const {playerIndex,handIndex} = state.fullscreen;
+    const p = state.players[playerIndex];
+    if(p && p.hand[handIndex]) p.hand[handIndex].isFaceUp=false;
+    renderHands();
+  }
+  state.fullscreen = {source:null,playerIndex:null,handIndex:null,deckId:null,orderPos:null};
+  els.fullscreenOverlay.style.display="none";
+}
+function navigateFullscreen(delta){
+  if(!state.fullscreen.source) return;
+  if(state.fullscreen.source==="hand"){
+    const pi = state.fullscreen.playerIndex;
+    let hi = state.fullscreen.handIndex;
+    const p = state.players[pi];
+    if(!p) return;
+    const newIndex = hi + delta;
+    if(newIndex<0 || newIndex>=p.hand.length) return;
+    p.hand[hi].isFaceUp=false;
+    state.fullscreen.handIndex = newIndex;
+    setFullscreenImageFromHand(pi,newIndex);
+  } else {
+    const deck = getDeckById(state.fullscreen.deckId);
+    if(!deck) return;
+    let pos = state.fullscreen.orderPos;
+    const newPos = pos + delta;
+    if(newPos<0 || newPos>=deck.order.length) return;
+    state.fullscreen.orderPos = newPos;
+    setFullscreenImageFromOrder(deck.id,newPos);
+  }
+}
+function returnFullscreenCard(){
+  if(state.fullscreen.source!=="hand") return;
+  const {playerIndex,handIndex} = state.fullscreen;
+  const p=state.players[playerIndex];
+  const card=p && p.hand[handIndex];
+  if(!card) return;
+  const isSeq = card.drawStyle === "sequential";
+  const msg = isSeq ? "Return this card to the top of the deck?" : "Return this card to the deck?";
+  if(!shouldConfirm(msg)) return;
+  const [removed]=p.hand.splice(handIndex,1);
+  const deck=getDeckById(removed.deckId);
+  if(deck){
+    if(isSeq) deck.drawPile.unshift(removed.cardIndex);
+    else { deck.drawPile.push(removed.cardIndex); shuffle(deck.drawPile); }
+  }
+  closeFullscreen();
+  renderHands();
+  renderDecks();
+}
+
+/* ---------- RETURN CARD FROM HAND ---------- */
+function returnCardFromHand(pi,ci){
+  const p=state.players[pi];
+  const card=p.hand[ci];
+  if(!card) return;
+  const isSeq = card.drawStyle === "sequential";
+  const msg = isSeq ? "Return this card to the top of the deck?" : "Return this card to the deck?";
+  if(!shouldConfirm(msg)) return;
+  const [removed]=p.hand.splice(ci,1);
+  const deck=getDeckById(removed.deckId);
+  if(deck){
+    if(isSeq) deck.drawPile.unshift(removed.cardIndex);
+    else { deck.drawPile.push(removed.cardIndex); shuffle(deck.drawPile); }
+  }
+  renderHands();
+  renderDecks();
+}
+
+/* ---------- DRAWING ---------- */
+function drawCard(pi){
+  const p=state.players[pi];
+  const ids=p.assignedDeckIds;
+  if(!ids.length){alert("Assign decks first.");return;}
+  if(p.mode==="individual"){
+    alert("Use the per-deck Draw buttons in Individual Decks mode.");
+    return;
+  }
+  const available = ids.map(getDeckById).filter(d=>d && d.drawPile.length>0);
+  if(!available.length){alert("Assigned decks are empty.");return;}
+  const deck = available[Math.floor(Math.random()*available.length)];
+  const rngIndex = Math.floor(Math.random()*deck.drawPile.length);
+  const cardIndex = deck.drawPile.splice(rngIndex,1)[0];
+  p.hand.push({deckId:deck.id,cardIndex,isFaceUp:false,drawStyle:"random"});
+  renderHands();
+  renderDecks();
+}
+function drawFromSpecificDeck(pi,slot){
+  const p=state.players[pi];
+  const deckId = p.assignedDeckIds[slot];
+  const deck = getDeckById(deckId);
+  if(!deck){alert("Deck not found.");return;}
+  if(!deck.drawPile.length){alert("This deck is empty.");return;}
+  const style = (p.slotDrawStyles && p.slotDrawStyles[slot]) || "random";
+  let cardIndex;
+  if(style==="sequential") cardIndex = deck.drawPile.shift();
+  else {
+    const rngIndex = Math.floor(Math.random()*deck.drawPile.length);
+    cardIndex = deck.drawPile.splice(rngIndex,1)[0];
+  }
+  p.hand.push({deckId:deck.id,cardIndex,isFaceUp:false,drawStyle:style});
+  renderHands();
+  renderDecks();
+}
+
+/* ---------- RETURN WHOLE HAND ---------- */
+function returnHand(pi){
+  const p=state.players[pi];
+  if(!p.hand.length){alert("Hand empty.");return;}
+  if(!confirm("Return entire hand?")) return;
+  const randomDecks = new Set();
+  p.hand.forEach(card=>{
+    const deck=getDeckById(card.deckId);
+    if(!deck) return;
+    if(card.drawStyle==="sequential") deck.drawPile.unshift(card.cardIndex);
+    else { deck.drawPile.push(card.cardIndex); randomDecks.add(deck.id); }
+  });
+  p.hand=[];
+  randomDecks.forEach(id=>{
+    const deck=getDeckById(id);
+    if(deck) shuffle(deck.drawPile);
+  });
+  renderHands();
+  renderDecks();
+}
+
+/* ---------- ORDER EDITOR & RETURN TO ORDER ---------- */
+function moveCardInDeck(deckId, fromPos, toPos){
+  const deck = getDeckById(deckId);
+  if(!deck) return;
+  const anyInHand = state.players.some(p=>p.hand.some(c=>c.deckId===deckId));
+  if(anyInHand){
+    alert("Cannot change order while cards from this deck are in players' hands. Return them first.");
+    return;
+  }
+  if(fromPos<0 || toPos<0 || fromPos>=deck.order.length || toPos>=deck.order.length) return;
+  const [moved] = deck.order.splice(fromPos,1);
+  deck.order.splice(toPos,0,moved);
+  deck.drawPile = [...deck.order];
+  renderDecks();
+}
+function returnDeckToOrder(deck){
+  const inPile = new Set(deck.drawPile);
+  deck.drawPile = deck.order.filter(idx=>inPile.has(idx));
+}
+
+/* ---------- DECK RENDER ---------- */
+function renderDecks(){
+  els.decksContainer.innerHTML="";
+  state.decks.forEach(deck=>{
+    const panel=document.createElement("div");
+    panel.className="deck-panel";
+
+    const head=document.createElement("div");
+    const name=document.createElement("input");
+    name.value=deck.name;
+    name.oninput=e=>{
+      deck.name=e.target.value||deck.name;
+      rebuildPlayersUI();
+    };
+    head.appendChild(name);
+    const stats=document.createElement("small");
+    stats.textContent=`Cards: ${deck.cards.length} • Remaining: ${deck.drawPile.length}`;
+    head.appendChild(stats);
+    panel.appendChild(head);
+
+    const main=document.createElement("div");
+    main.className="deck-panel-main";
+
+    const prev=document.createElement("div");
+    prev.className="deck-preview-small";
+    const im=document.createElement("img");
+    im.src=deck.backUrl;
+    prev.appendChild(im);
+    main.appendChild(prev);
+
+    const btns=document.createElement("div");
+
+    const sh=document.createElement("button");
+    sh.textContent="Shuffle Deck";
+    sh.onclick=()=>{shuffle(deck.drawPile);renderDecks();};
+    btns.appendChild(sh);
+
+    const rt=document.createElement("button");
+    rt.textContent="Return to Order";
+    rt.onclick=()=>{returnDeckToOrder(deck);renderDecks();};
+    btns.appendChild(rt);
+
+    const edit=document.createElement("button");
+    edit.textContent = deck.showOrderEditor ? "Hide Order" : "Edit Order";
+    edit.onclick=()=>{
+      deck.showOrderEditor = !deck.showOrderEditor;
+      renderDecks();
+    };
+    btns.appendChild(edit);
+
+    const ex=document.createElement("button");
+    ex.textContent="Export Deck";
+    ex.onclick=()=>exportSingleDeck(deck.id);
+    btns.appendChild(ex);
+
+    main.appendChild(btns);
+    panel.appendChild(main);
+
+    if(deck.showOrderEditor){
+      const editor=document.createElement("div");
+      editor.className="deck-order-editor";
+      const note=document.createElement("div");
+      note.style.fontSize=".8rem";
+      note.style.color="var(--muted)";
+      note.textContent="Reorder cards (only when no cards are in hands). Top of the deck is first in this list. Tap a card to view it larger.";
+      editor.appendChild(note);
+
+      deck.order.forEach((cardIdx,pos)=>{
+        const row=document.createElement("div");
+        row.className="deck-order-row";
+
+        const thumb=document.createElement("div");
+        thumb.className="deck-order-thumb";
+        const img=document.createElement("img");
+        img.src=deck.cards[cardIdx].frontUrl;
+        img.onclick=()=>openFullscreenFromOrder(deck.id,pos);
+        thumb.appendChild(img);
+        row.appendChild(thumb);
+
+        const title=document.createElement("div");
+        title.className="deck-order-title";
+        title.textContent=`Card ${pos+1}`;
+        row.appendChild(title);
+
+        const controls=document.createElement("div");
+        controls.className="deck-order-buttons";
+        const up=document.createElement("button");
+        up.textContent="↑";
+        up.disabled=(pos===0);
+        up.onclick=()=>moveCardInDeck(deck.id,pos,pos-1);
+        controls.appendChild(up);
+        const down=document.createElement("button");
+        down.textContent="↓";
+        down.disabled=(pos===deck.order.length-1);
+        down.onclick=()=>moveCardInDeck(deck.id,pos,pos+1);
+        controls.appendChild(down);
+        row.appendChild(controls);
+
+        editor.appendChild(row);
+      });
+      panel.appendChild(editor);
+    }
+
+    els.decksContainer.appendChild(panel);
+  });
+}
+
+/* ---------- EXPORT/IMPORT SINGLE DECK ---------- */
+async function exportSingleDeck(id){
+  const deck=getDeckById(id);
+  if(!deck){alert("Deck not found");return;}
+  const zip=new JSZip();
+  const ord = deck.order && deck.order.length===deck.cards.length
+    ? deck.order
+    : deck.cards.map((_,i)=>i);
+  for(let i=0;i<ord.length;i++){
+    const idx = ord[i];
+    const blob=await fetch(deck.cards[idx].frontUrl).then(r=>r.blob());
+    zip.file(`card_${String(i+1).padStart(4,"0")}.png`,blob);
+  }
+  const backBlob=await fetch(deck.backUrl).then(r=>r.blob());
+  zip.file("card_back.png",backBlob);
+  const out=await zip.generateAsync({type:"blob"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(out);
+  a.download=(deck.name||"deck")+".zip";
+  a.click();
+}
+async function importDeckFromZip(file){
+  const zip=await JSZip.loadAsync(file);
+  const names=Object.keys(zip.files);
+  const fronts=names.filter(n=>/^card_\d+/.test(n)).sort();
+  const frontFiles=[];
+  for(const fn of fronts){
+    const bl=await zip.file(fn).async("blob");
+    frontFiles.push(new File([bl],fn,{type:"image/png"}));
+  }
+  const backBlob=await zip.file("card_back.png").async("blob");
+  const backFile=new File([backBlob],"card_back.png",{type:"image/png"});
+  state.importedFronts=frontFiles;
+  state.importedBack=backFile;
+  alert("Deck imported. Name it and click Create Deck.");
+}
+
+/* ---------- EXPORT/IMPORT GAME (order + per-slot styles) ---------- */
+async function exportGame(){
+  if(!state.decks.length){alert("No decks.");return;}
+  const zip=new JSZip();
+  const metaDecks=[];
+  for(let i=0;i<state.decks.length;i++){
+    const deck=state.decks[i];
+    const tag=String(i+1).padStart(2,"0");
+    metaDecks.push({name:deck.name});
+    const ord = deck.order && deck.order.length===deck.cards.length
+      ? deck.order
+      : deck.cards.map((_,idx)=>idx);
+    for(let j=0;j<ord.length;j++){
+      const idx=ord[j];
+      const blob=await fetch(deck.cards[idx].frontUrl).then(r=>r.blob());
+      zip.file(`deck_${tag}_card_${String(j+1).padStart(4,"0")}.png`,blob);
+    }
+    const backBlob=await fetch(deck.backUrl).then(r=>r.blob());
+    zip.file(`deck_${tag}_card_back.png`,backBlob);
+  }
+  const meta={
+    name:state.gameName,
+    confirmReturn:state.requireReturnConfirm,
+    drawNumberMode:state.drawNumberMode,
+    players:state.players.map(p=>({
+      name:p.name,
+      mode:p.mode,
+      decks:p.assignedDeckIds.map(id=>getDeckById(id).name),
+      slotDrawStyles:p.slotDrawStyles
+    })),
+    decks:metaDecks
+  };
+  zip.file("game.json",JSON.stringify(meta,null,2));
+  const out=await zip.generateAsync({type:"blob"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(out);
+  a.download=(state.gameName||"game")+".zip";
+  a.click();
+}
+async function importGame(file){
+  const zip=await JSZip.loadAsync(file);
+  const j=zip.file("game.json");
+  if(!j){alert("Invalid game ZIP.");return;}
+  const data=JSON.parse(await j.async("string"));
+
+  state.decks=[];
+  state.players=[];
+  state.gameName=data.name||"";
+  els.gameTitleInput.value=state.gameName;
+  els.gameTitleDisplay.textContent=state.gameName||"Untitled Game";
+
+  state.requireReturnConfirm = data.confirmReturn !== false;
+  state.drawNumberMode = data.drawNumberMode || "none";
+  els.returnConfirmSelect.value = state.requireReturnConfirm ? "on" : "off";
+  els.drawNumbersSelect.value =
+    state.drawNumberMode==="chrono" ? "chrono" :
+    state.drawNumberMode==="perDeck" ? "perDeck" : "no";
+
+  const deckDefs=data.decks||[];
+  for(let i=0;i<deckDefs.length;i++){
+    const deckName=deckDefs[i].name;
+    const tag=String(i+1).padStart(2,"0");
+    const fronts=[];
+    const test=new RegExp(`^deck_${tag}_card_\\d+\\.png$`);
+    for(const fn of Object.keys(zip.files)){
+      if(test.test(fn) && !fn.includes("back")){
+        const bl=await zip.file(fn).async("blob");
+        fronts.push(new File([bl],fn,{type:"image/png"}));
+      }
+    }
+    const backName=`deck_${tag}_card_back.png`;
+    const backBlob=await zip.file(backName).async("blob");
+    const backFile=new File([backBlob],backName,{type:"image/png"});
+    createDeckFromFiles(fronts,backFile,deckName);
+  }
+
+  state.players = (data.players||[]).map((p,i)=>{
+    const assigned=[];
+    (p.decks||[]).forEach(name=>{
+      const dk=state.decks.find(x=>x.name===name);
+      if(dk) assigned.push(dk.id);
+    });
+    let mode = p.mode || "individual";
+    if(mode==="manual") mode="individual";
+    if(mode==="sequential") mode="merged";
+    const savedStyles = p.slotDrawStyles || [];
+    const slotDrawStyles = assigned.map((_,idx)=> savedStyles[idx]==="sequential" ? "sequential" : "random");
+    return {
+      name:p.name||`Player ${i+1}`,
+      mode,
+      assignedDeckIds:assigned,
+      slotDrawStyles,
+      hand:[]
+    };
+  });
+
+  els.playerCount.value=state.players.length || 1;
+  rebuildPlayersUI();
+  renderHands();
+  renderDecks();
+}
+
+/* ---------- EVENTS ---------- */
+els.gameTitleInput.oninput=e=>{
+  state.gameName=e.target.value;
+  els.gameTitleDisplay.textContent=e.target.value||"Untitled Game";
+};
+els.playerCount.onchange=()=>{
+  setPlayerCount(parseInt(els.playerCount.value)||1);
+  rebuildPlayersUI();
+  renderHands();
+};
+els.layoutModeSelect.onchange=e=>{
+  state.layoutMode=e.target.value;
+  rebuildTabs();
+  applyLayout();
+};
+els.returnConfirmSelect.onchange=e=>{
+  state.requireReturnConfirm = (e.target.value==="on");
+};
+els.drawNumbersSelect.onchange=e=>{
+  const v=e.target.value;
+  state.drawNumberMode = v==="chrono" ? "chrono" : v==="perDeck" ? "perDeck" : "none";
+  renderHands();
+};
+els.initDeckBtn.onclick=()=>{
+  const f=state.importedFronts||els.cardFronts.files;
+  const b=state.importedBack||els.cardBack.files[0];
+  if(!f||!f.length||!b){alert("Upload/import fronts + back first.");return;}
+  createDeckFromFiles(f,b,els.deckName.value||null);
+  els.deckName.value="";
+  setPlayerCount(parseInt(els.playerCount.value)||1);
+  rebuildPlayersUI();
+  renderHands();
+  renderDecks();
+};
+els.resetEverythingBtn.onclick=()=>{
+  if(!confirm("Reset everything?")) return;
+  Object.assign(state,{
+    decks:[],players:[],importedFronts:null,importedBack:null,
+    gameName:"",layoutMode:"tabs",requireReturnConfirm:true,drawNumberMode:"none",
+    fullscreen:{source:null,playerIndex:null,handIndex:null,deckId:null,orderPos:null}
+  });
+  els.gameTitleDisplay.textContent="Untitled Game";
+  els.gameTitleInput.value="";
+  els.playerCount.value="2";
+  els.layoutModeSelect.value="tabs";
+  els.returnConfirmSelect.value="on";
+  els.drawNumbersSelect.value="no";
+  els.cardFronts.value="";
+  els.cardBack.value="";
+  els.importZip.value="";
+  els.deckName.value="";
+  setPlayerCount(2);
+  rebuildPlayersUI();
+  renderHands();
+  renderDecks();
+};
+els.exportGameBtn.onclick=exportGame;
+els.importGameBtn.onclick=()=>els.importGameInput.click();
+els.importGameInput.onchange=e=>{
+  const file=e.target.files[0];
+  if(file) importGame(file);
+};
+els.importZip.onchange=e=>{
+  const f=e.target.files[0];
+  if(f) importDeckFromZip(f);
+};
+els.clearHandsBtn.onclick=()=>{
+  const randomDecks=new Set();
+  state.players.forEach(p=>{
+    p.hand.forEach(card=>{
+      const deck=getDeckById(card.deckId);
+      if(!deck) return;
+      if(card.drawStyle==="sequential") deck.drawPile.unshift(card.cardIndex);
+      else { deck.drawPile.push(card.cardIndex); randomDecks.add(deck.id); }
+    });
+    p.hand=[];
+  });
+  randomDecks.forEach(id=>{
+    const deck=getDeckById(id);
+    if(deck) shuffle(deck.drawPile);
+  });
+  renderHands();
+  renderDecks();
+};
+els.shuffleAllDecksBtn.onclick=()=>{
+  state.decks.forEach(d=>shuffle(d.drawPile));
+  renderDecks();
+};
+els.returnAllDecksBtn.onclick=()=>{
+  state.decks.forEach(returnDeckToOrder);
+  renderDecks();
+};
+
+els.fullscreenOverlay.onclick=e=>{
+  if(e.target===els.fullscreenOverlay) closeFullscreen();
+};
+els.fullscreenImage.onclick=e=>{
+  e.stopPropagation();
+  closeFullscreen();
+};
+els.fullscreenPrev.onclick=e=>{
+  e.stopPropagation();
+  navigateFullscreen(-1);
+};
+els.fullscreenNext.onclick=e=>{
+  e.stopPropagation();
+  navigateFullscreen(1);
+};
+
+document.addEventListener("keydown",e=>{
+  if(els.fullscreenOverlay.style.display!=="flex") return;
+  if(e.key==="ArrowLeft"){e.preventDefault();navigateFullscreen(-1);}
+  else if(e.key==="ArrowRight"){e.preventDefault();navigateFullscreen(1);}
+  else if(e.key==="Escape"){e.preventDefault();closeFullscreen();}
+});
+
+let swipeStartX=null;
+els.fullscreenOverlay.addEventListener("touchstart",e=>{
+  if(e.touches.length===1) swipeStartX = e.touches[0].clientX;
+},{passive:true});
+els.fullscreenOverlay.addEventListener("touchend",e=>{
+  if(swipeStartX===null) return;
+  const dx = e.changedTouches[0].clientX - swipeStartX;
+  const threshold = 30;
+  if(Math.abs(dx)>threshold){
+    if(dx<0) navigateFullscreen(1);
+    else navigateFullscreen(-1);
+  }
+  swipeStartX=null;
+},{passive:true});
+
+/* ---------- INIT ---------- */
+setPlayerCount(2);
+rebuildPlayersUI();
+renderHands();
+renderDecks();
+els.layoutModeSelect.value="tabs";
+els.returnConfirmSelect.value="on";
+els.drawNumbersSelect.value="no";
+</script>
+</body>
+</html>
